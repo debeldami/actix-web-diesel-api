@@ -4,6 +4,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::PgConnection;
 use dotenv::dotenv;
+use serde::Deserialize;
 use std::env;
 mod models;
 mod schema;
@@ -11,8 +12,17 @@ use self::schema::cats::dsl::*;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
+#[derive(Deserialize)]
+struct CatEndpointPath {
+    id: i32,
+}
+
 pub fn api_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::scope("/api").route("/cats", web::get().to(cats_endpoint)));
+    cfg.service(
+        web::scope("/api")
+            .route("/cats", web::get().to(cats_endpoint))
+            .route("/cat/{id}", web::get().to(cat_endpoint)),
+    );
 }
 
 pub fn data_setup() -> DbPool {
@@ -40,6 +50,26 @@ async fn cats_endpoint(pool: web::Data<DbPool>) -> Result<HttpResponse, Error> {
     .unwrap();
 
     match cats_data {
+        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Err(e) => Err(error::ErrorInternalServerError(e)),
+    }
+}
+
+async fn cat_endpoint(
+    pool: web::Data<DbPool>,
+    cat_id: web::Path<CatEndpointPath>,
+) -> Result<HttpResponse, Error> {
+    let cat_data = web::block(move || {
+        let mut conn = pool.get();
+
+        let connection = conn.as_mut().unwrap();
+
+        cats.filter(id.eq(cat_id.id)).first::<Cat>(connection)
+    })
+    .await
+    .unwrap();
+
+    match cat_data {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(e) => Err(error::ErrorInternalServerError(e)),
     }
