@@ -1,0 +1,17 @@
+[package]
+name = "apedex-api"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+diesel = { version = "2.0.0", features = ["postgres", "r2d2"] }
+serde = { version = "1.0.147", features = ["derive"] }
+r2d2 = "0.8.10"
+actix-web = "4.2.1"
+actix-files = "0.6.2"
+serde_json = "1.0.88"
+dotenv = "0.15.0"
+actix-rt = "2.7.0"
+
