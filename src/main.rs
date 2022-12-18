@@ -11,6 +11,10 @@ use self::schema::cats::dsl::*;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
+pub fn api_config(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::scope("/api").route("/cats", web::get().to(cats_endpoint)));
+}
+
 pub fn data_setup() -> DbPool {
     dotenv().ok();
 
@@ -50,7 +54,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
-            .service(web::scope("/api").route("/cats", web::get().to(cats_endpoint)))
+            .configure(api_config)
     })
     .bind("127.0.0.1:8080")?
     .run()
@@ -69,7 +73,7 @@ mod tests {
         let mut app = test::init_service(
             App::new()
                 .app_data(web::Data::new(pool.clone()))
-                .service(web::scope("/api").route("/cats", web::get().to(cats_endpoint))),
+                .configure(api_config),
         )
         .await;
 
