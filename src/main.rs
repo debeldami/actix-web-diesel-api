@@ -9,11 +9,14 @@ use std::env;
 mod models;
 mod schema;
 use self::schema::cats::dsl::*;
+use validator::Validate;
+use validator_derive::Validate;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 struct CatEndpointPath {
+    #[validate(range(min = 1, max = 150))]
     id: i32,
 }
 
@@ -47,18 +50,18 @@ async fn cats_endpoint(pool: web::Data<DbPool>) -> Result<HttpResponse, Error> {
         cats.limit(100).load::<Cat>(connection)
     })
     .await
-    .unwrap();
+    .map_err(|e| error::ErrorInternalServerError(e))?
+    .map_err(|e| error::ErrorNotFound(e))?;
 
-    match cats_data {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(e) => Err(error::ErrorInternalServerError(e)),
-    }
+    Ok(HttpResponse::Ok().json(cats_data))
 }
 
 async fn cat_endpoint(
     pool: web::Data<DbPool>,
     cat_id: web::Path<CatEndpointPath>,
 ) -> Result<HttpResponse, Error> {
+    cat_id.validate().map_err(|e| error::ErrorBadRequest(e))?;
+
     let cat_data = web::block(move || {
         let mut conn = pool.get();
 
@@ -67,12 +70,10 @@ async fn cat_endpoint(
         cats.filter(id.eq(cat_id.id)).first::<Cat>(connection)
     })
     .await
-    .unwrap();
+    .map_err(|e| error::ErrorInternalServerError(e))?
+    .map_err(|e| error::ErrorNotFound(e))?;
 
-    match cat_data {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(e) => Err(error::ErrorInternalServerError(e)),
-    }
+    Ok(HttpResponse::Ok().json(cat_data))
 }
 
 #[actix_web::main]
