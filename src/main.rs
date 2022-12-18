@@ -1,5 +1,5 @@
 use self::models::*;
-use actix_web::{error, web, App, Error, HttpResponse, HttpServer};
+use actix_web::{web, App, Error, HttpResponse, HttpServer};
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::PgConnection;
@@ -11,6 +11,8 @@ mod schema;
 use self::schema::cats::dsl::*;
 use validator::Validate;
 use validator_derive::Validate;
+mod errors;
+use self::errors::UserError;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
@@ -50,8 +52,8 @@ async fn cats_endpoint(pool: web::Data<DbPool>) -> Result<HttpResponse, Error> {
         cats.limit(100).load::<Cat>(connection)
     })
     .await
-    .map_err(|e| error::ErrorInternalServerError(e))?
-    .map_err(|e| error::ErrorNotFound(e))?;
+    .map_err(|_| UserError::UnexpectedError)?
+    .map_err(|_| UserError::DBPoolGetError)?;
 
     Ok(HttpResponse::Ok().json(cats_data))
 }
@@ -60,7 +62,7 @@ async fn cat_endpoint(
     pool: web::Data<DbPool>,
     cat_id: web::Path<CatEndpointPath>,
 ) -> Result<HttpResponse, Error> {
-    cat_id.validate().map_err(|e| error::ErrorBadRequest(e))?;
+    cat_id.validate().map_err(|_| UserError::ValidationError)?;
 
     let cat_data = web::block(move || {
         let mut conn = pool.get();
@@ -70,8 +72,8 @@ async fn cat_endpoint(
         cats.filter(id.eq(cat_id.id)).first::<Cat>(connection)
     })
     .await
-    .map_err(|e| error::ErrorInternalServerError(e))?
-    .map_err(|e| error::ErrorNotFound(e))?;
+    .map_err(|_| UserError::UnexpectedError)?
+    .map_err(|_| UserError::NotFoundError)?;
 
     Ok(HttpResponse::Ok().json(cat_data))
 }

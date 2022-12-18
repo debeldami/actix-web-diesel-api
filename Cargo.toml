@@ -16,4 +16,5 @@ dotenv = "0.15.0"
 actix-rt = "2.7.0"
 validator = "0.16.0"
 validator_derive = "0.16.0"
+derive_more ="0.99.17"
 
