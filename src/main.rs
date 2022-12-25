@@ -25,6 +25,9 @@ struct CatEndpointPath {
 pub fn api_config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api")
+            .app_data(
+                web::PathConfig::default().error_handler(|_, _| UserError::ValidationError.into()),
+            )
             .route("/cats", web::get().to(cats_endpoint))
             .route("/cat/{id}", web::get().to(cat_endpoint)),
     );
