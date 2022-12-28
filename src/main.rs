@@ -13,6 +13,8 @@ use validator::Validate;
 use validator_derive::Validate;
 mod errors;
 use self::errors::UserError;
+use actix_web::middleware::Logger;
+use log::{error, info, warn};
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
@@ -55,8 +57,14 @@ async fn cats_endpoint(pool: web::Data<DbPool>) -> Result<HttpResponse, Error> {
         cats.limit(100).load::<Cat>(connection)
     })
     .await
-    .map_err(|_| UserError::UnexpectedError)?
-    .map_err(|_| UserError::DBPoolGetError)?;
+    .map_err(|_| {
+        error!("Failed to get cats");
+        UserError::UnexpectedError
+    })?
+    .map_err(|_| {
+        error!("Failed to get DB connection from pool");
+        UserError::DBPoolGetError
+    })?;
 
     Ok(HttpResponse::Ok().json(cats_data))
 }
@@ -65,7 +73,12 @@ async fn cat_endpoint(
     pool: web::Data<DbPool>,
     cat_id: web::Path<CatEndpointPath>,
 ) -> Result<HttpResponse, Error> {
-    cat_id.validate().map_err(|_| UserError::ValidationError)?;
+    let query_id = cat_id.id.clone();
+
+    cat_id.validate().map_err(|_| {
+        warn!("Parameter validation failed");
+        UserError::ValidationError
+    })?;
 
     let cat_data = web::block(move || {
         let mut conn = pool.get();
@@ -75,20 +88,31 @@ async fn cat_endpoint(
         cats.filter(id.eq(cat_id.id)).first::<Cat>(connection)
     })
     .await
-    .map_err(|_| UserError::UnexpectedError)?
-    .map_err(|_| UserError::NotFoundError)?;
+    .map_err(|_| {
+        error!("Cat ID: {} not found in DB", &query_id);
+        UserError::UnexpectedError
+    })?
+    .map_err(|_| {
+        error!("Failed to get DB connection from pool");
+        UserError::NotFoundError
+    })?;
 
     Ok(HttpResponse::Ok().json(cat_data))
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    std::env::set_var("RUST_LOG", "debug");
+
+    env_logger::init();
+
     let pool = data_setup();
 
-    println!("Listening on port 8080");
+    info!("Listening on port 8080");
 
     HttpServer::new(move || {
         App::new()
+            .wrap(Logger::default())
             .app_data(web::Data::new(pool.clone()))
             .configure(api_config)
     })

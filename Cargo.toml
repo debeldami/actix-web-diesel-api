@@ -17,4 +17,6 @@ actix-rt = "2.7.0"
 validator = "0.16.0"
 validator_derive = "0.16.0"
 derive_more ="0.99.17"
+log = "0.4.17"
+env_logger = "0.10.0"
 
